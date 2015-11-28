@@ -30,22 +30,20 @@ package isp.integrity; /**
  */
 
 import javax.crypto.KeyGenerator;
+import javax.crypto.Mac;
+import javax.xml.bind.DatatypeConverter;
 import java.security.Key;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.logging.Logger;
 
 /**
  * @author iztok
  */
 public class AgentCommunicationHMAC {
-
-    /**
-     * Standard Algorithm Names
-     * http://docs.oracle.com/javase/6/docs/technotes/guides/security/StandardNames.html
-     */
-    public static final String HMAC_ALG1 = "HmacMD5";
-    public static final String HMAC_ALG2 = "HmacSHA1";
+    private final static Logger LOG = Logger.getLogger(AgentCommunicationHMAC.class.getCanonicalName());
 
     public static void main(String[] args) throws NoSuchAlgorithmException {
 
@@ -54,65 +52,62 @@ public class AgentCommunicationHMAC {
          * Alice and Bob agree upon a shared secret session key that will be 
          * used for hash based message authentication code.
          */
-        final Key hmacKey = KeyGenerator.getInstance(HMACExample.HMAC_ALG1).generateKey();
+        final Key hmacKey = KeyGenerator.getInstance("HmacMD5").generateKey();
 
         /**
          * STEP 2.
-         * Setup a (un)secure communication channel.
+         * Setup an insecure communication channel.
          */
-        final BlockingQueue<String> alice2bob = new LinkedBlockingQueue<String>();
-        final BlockingQueue<String> bob2alice = new LinkedBlockingQueue<String>();
+        final BlockingQueue<String> alice2bob = new LinkedBlockingQueue<>();
+        final BlockingQueue<String> bob2alice = new LinkedBlockingQueue<>();
 
         /**
          * STEP 3.
          * Agent Alice definition:
          * - uses the communication channel,
+         * - uses shared secret session key to create HMAC.
          * - sends a message that is comprised of:
          *   o message
-         *   o HMAC
-         * - uses shared secret session key to
-         *   create HMAC.
+         *   o HMAC.
          */
-        final Agent alice = new Agent(bob2alice, alice2bob, null, null, hmacKey, null) {
-
+        final Agent alice = new Agent(bob2alice, alice2bob, null, null, hmacKey, "HmacMD5") {
             @Override
             public void run() {
                 try {
                     /**
                      * STEP 3.1
                      * Alice writes a message and sends to Bob.
-                     * This action is recorded in Alice's log.
                      */
-                    String TEXT = "I love you Bob. Kisses, Alice.";
-                    super.outgoing.put(TEXT);
-                    System.out.println("[Alice::Log]: I have sent the following message to Bob.");
-                    System.out.println("[Alice::Log]: message: " + TEXT);
+                    final String text = "I love you Bob. Kisses, Alice.";
+                    outgoing.put(text);
 
                     /**
-                     * STEP 3.2
+                     * TODO: STEP 3.2
                      * In addition, Alice creates HMAC using selected
                      * hash algorithm and shared secret session key.
                      */
-                    //TODO
-                    //byte[] hmac_TEXT
+                    final Mac alg = Mac.getInstance(macAlgorithm);
+                    alg.init(macKey);
+                    final byte[] hmac = alg.doFinal(text.getBytes("UTF-8"));
 
                     /**
-                     * STEP 3.3
+                     * TODO STEP 3.3
                      * Special care has to be taken when transferring binary stream 
-                     * over the communication channel, thus, 
-                     * Base64 encoding/decoding is used to transfer checksums.
+                     * over the communication channel: convert byte array into string
+                     * of HEX values with DatatypeConverter.printHexBinary(byte[])
                      */
-                    //TODO
-                    //super.outgoing.put(Base64.encode(hmac_TEXT));
-
+                    final String hmacAsHex = DatatypeConverter.printHexBinary(hmac);
+                    outgoing.put(hmacAsHex);
+                    LOG.info("[Alice]: Sending '" + text + "' with hmac: '" + hmacAsHex + "'");
                 } catch (Exception ex) {
+                    LOG.severe("Exception: " + ex.getMessage());
                 }
             }
         };
 
         /**
          * STEP 4.
-         * Agent Bob definition:
+         * Agent Bob:
          * - uses the communication channel,
          * - receives the message that is comprised of:
          *   o message
@@ -120,7 +115,7 @@ public class AgentCommunicationHMAC {
          * - uses shared secret session key to
          *   verify message authenticity and integrity.
          */
-        final Agent bob = new Agent(alice2bob, bob2alice, null, null, hmacKey, null) {
+        final Agent bob = new Agent(alice2bob, bob2alice, null, null, hmacKey, "HmacMD5") {
 
             @Override
             public void run() {
@@ -129,42 +124,36 @@ public class AgentCommunicationHMAC {
                      * STEP 4.1
                      * Bob receives the message from Alice.
                      * This action is recorded in Bob's log.
-                     *
-                     * IS AUTHENTICITY AND INTEGRITY PROPERTY PRESERVED??? WE
-                     * DO NOT KNOW THIS YET!!!
                      */
-                    String received_TEXT = incoming.take();
-                    System.out.println("[Bob::Log]: I have received the following message from Alice.");
-                    System.out.println("[Bob::Log]: RECEIVED message: " + received_TEXT);
+                    final String receivedText = incoming.take();
+                    final String receivedHMACHex = incoming.take();
+                    LOG.info("[Bob]: Received message '" + receivedText + "' with HMAC '" + receivedHMACHex + "'");
 
                     /**
-                     * STEP 4.2
-                     * Special care has to be taken when transferring binary stream 
-                     * over the communication channel, thus, 
-                     * Base64 encoding/decoding is used to transfer checksums.
+                     * TODO: STEP 4.2
+                     * Special care has to be taken when transferring binary stream
+                     * over the communication channel: convert byte array into string
+                     * of HEX values with DatatypeConverter.parseHexBinary(String)
                      */
-                    //TODO
-                    //byte[] received_hmac_TEXT = Base64.decode(super.incoming.take());
+                    final byte[] receivedHMAC = DatatypeConverter.parseHexBinary(receivedHMACHex);
 
                     /**
-                     * STEP 4.3
+                     * TODO: STEP 4.3
                      * Bob calculates new HMAC using selected hash algorithm,
                      * shared secret session key and received text.
                      */
-                    //TODO
-                    //byte[] calculated_hmac_TEXT
+                    final Mac alg = Mac.getInstance(macAlgorithm);
+                    alg.init(macKey);
+                    final byte[] localHMAC = alg.doFinal(receivedText.getBytes("UTF-8"));
 
                     /**
-                     * STEP 4.4
+                     * TODO: STEP 4.4
                      * Verify if received and calculated HMAC match.
                      */
-                    //TODO
-                    /*
-                    if(true == Arrays.equals(calculated_hmac_TEXT, received_hmac_TEXT))
-                        System.out.println("[Bob::Log]: message AUTHENTICITY AND INTEGRITY VERIFIED.");
+                    if (Arrays.equals(localHMAC, receivedHMAC))
+                        LOG.info("[Bob]: Authenticity and integrity verified.");
                     else
-                        System.out.println("[Bob::Log]: message AUTHENTICITY AND INTEGRITY IS ***NOT*** VERIFIED.");
-                    */
+                        LOG.severe("[Bob]: Failed to verify authenticity and integrity.");
 
                 } catch (Exception ex) {
                 }

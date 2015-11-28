@@ -1,7 +1,10 @@
 package isp.integrity;
 
 import javax.xml.bind.DatatypeConverter;
+import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Logger;
@@ -44,8 +47,8 @@ public class AgentCommunicationMessageDigest {
          * STEP 1.
          * Setup an insecure communication channel.
          */
-        final BlockingQueue<String> alice2bob = new LinkedBlockingQueue<String>();
-        final BlockingQueue<String> bob2alice = new LinkedBlockingQueue<String>();
+        final BlockingQueue<String> alice2bob = new LinkedBlockingQueue<>();
+        final BlockingQueue<String> bob2alice = new LinkedBlockingQueue<>();
 
         /**
          * STEP 2.
@@ -70,42 +73,36 @@ public class AgentCommunicationMessageDigest {
                      */
                     final String message = "I love you Bob. Kisses, Alice.";
                     outgoing.put(message);
-                    //LOG.info("Alice: Sending to Bob: " + message);
 
                     /**
-                     * STEP 2.2
+                     * TODO: STEP 2.2
                      * In addition, Alice creates message digest using selected
                      * hash algorithm.
                      */
-                    //TODO
-                    //byte[] hash_TEXT
-
                     final MessageDigest digestAlgorithm = MessageDigest.getInstance("MD5");
-                    final String hash = DatatypeConverter
-                            .printHexBinary(digestAlgorithm.digest(message.getBytes("UTF-8")));
+                    final byte[] digest = digestAlgorithm.digest(message.getBytes("UTF-8"));
+                    final String digestAsHex = DatatypeConverter.printHexBinary(digest);
 
                     /**
-                     * STEP 2.3
+                     * TODO STEP 2.3
                      * Special care has to be taken when transferring binary stream 
-                     * over the communication channel, thus, 
-                     * Base64 encoding/decoding is used to transfer checksums.
+                     * over the communication channel: convert byte array into string
+                     * of HEX values with DatatypeConverter.printHexBinary(byte[])
                      */
-                    //TODO
-                    //super.outgoing.put(Base64.encode(hash_TEXT));
-                    outgoing.put(hash);
-                    LOG.info("Alice: Sending to Bob: '" + message + "', hash: " + hash);
-                } catch (Exception ex) {
+                    outgoing.put(digestAsHex);
+                    LOG.info("Alice: Sending to Bob: '" + message + "', digest: " + digestAsHex);
+                } catch (InterruptedException | NoSuchAlgorithmException | UnsupportedEncodingException e) {
+                    LOG.severe("Exception: " + e.getMessage());
                 }
             }
         };
 
         /**
-         * STEP 3.
-         * Agent Bob definition:
+         * STEP 3. Agent Bob
          * - uses the communication channel,
          * - receives the message that is comprised of:
-         *   o message
-         *   o Message Digest
+         *   - message
+         *   - message digest
          * - checks if received and calculated message digest checksum match.
          */
         final Agent bob = new Agent(alice2bob, bob2alice, null, null, null, "MD5") {
@@ -122,35 +119,33 @@ public class AgentCommunicationMessageDigest {
                     LOG.info("Bob: I have received: " + message);
 
                     /**
-                     * STEP 3.2
+                     * TODO STEP 3.2
                      * Special care has to be taken when transferring binary stream 
-                     * over the communication channel, thus, 
-                     * Base64 encoding/decoding is used to transfer checksums.
+                     * over the communication channel: convert received string into
+                     * byte array with DatatypeConverter.parseHexBinary(String)
                      */
-                    //TODO
-                    //byte[] received_hash_TEXT = Base64.decode(super.incoming.take());
+                    final String receivedDigestAsHex = incoming.take();
+                    final byte[] receivedDigest = DatatypeConverter.parseHexBinary(receivedDigestAsHex);
 
                     /**
-                     * STEP 3.3
+                     * TODO: STEP 3.3
                      * Bob calculates new message digest using selected hash algorithm and
                      * received text.
                      */
-                    //TODO
-                    //byte[] calculated_hash_TEXT
+                    final MessageDigest digestAlgorithm = MessageDigest.getInstance("MD5");
+                    final byte[] computedDigest = digestAlgorithm.digest(message.getBytes("UTF-8"));
 
                     /**
-                     * STEP 3.4
+                     * TODO STEP 3.4
                      * Verify if received and calculated message digest checksum match.
                      */
-                    //TODO
-                    /*
-                    if(true == Arrays.equals(calculated_hash_TEXT, received_hash_TEXT))
-                        System.out.println("[Bob::Log]: message INTEGRITY VERIFIED.");
-                    else
-                        System.out.println("[Bob::Log]: message INTEGRITY IS ***NOT*** VERIFIED.");
-                    */
-
-                } catch (Exception ex) {
+                    if (Arrays.equals(receivedDigest, computedDigest)) {
+                        LOG.info("Integrity checked");
+                    } else {
+                        LOG.warning("Integrity check failed.");
+                    }
+                } catch (InterruptedException | NoSuchAlgorithmException | UnsupportedEncodingException e) {
+                    LOG.severe("Exception: " + e.getMessage());
                 }
             }
         };

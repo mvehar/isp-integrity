@@ -1,87 +1,79 @@
-package isp.integrity; /**
+package isp.integrity;
+
+import javax.xml.bind.DatatypeConverter;
+import java.io.UnsupportedEncodingException;
+import java.security.InvalidKeyException;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
+import java.security.Signature;
+import java.security.SignatureException;
+
+/**
  * I0->I1->A1->B1->A2->B2->[A3]->B3
- * 
+ * <p/>
  * EXERCISE A3:
- * 
+ * <p/>
  * EXERCISE:
  * - Study this example.
- * 
+ * <p/>
  * INFO:
  * http://docs.oracle.com/javase/6/docs/technotes/guides/security/crypto/CryptoSpec.html#Signature
- * 
+ *
  * @author Iztok Starc <iztok.starc@fri.uni-lj.si>
- * @date 12. 12. 2011
  * @version 1
+ * @date 12. 12. 2011
  */
-
-
-import java.security.*;
-
 public class SignatureExample {
-    
-    private static KeyPair kp;
-    private static PublicKey pubSignKey;
-    private static PrivateKey privSignKey;
-    
-    /**
-     * Standard Algorithm Names
-     * http://docs.oracle.com/javase/6/docs/technotes/guides/security/StandardNames.html
-     */
-    public static String KEYGEN_ALG = "RSA";
-    public static String SIGN_ALG1 = "MD5withRSA";
-    public static String SIGN_ALG2 = "SHA1withRSA";
-    
-    public static String TEXT = "We would like to provide data integrity.";
-    
-    public static void main(String[] args) throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
-        
+    public static void main(String[] args)
+            throws NoSuchAlgorithmException, InvalidKeyException, SignatureException, UnsupportedEncodingException {
+
+        // The message we want to sign
+        final String text = "We would like to provide data integrity.";
+
         /**
          * STEP 1.
-         * Alice creates public and private key. Bob receives her public key securely.
+         * We create a public-private key pair.
+         * Standard Algorithm Names
+         * http://docs.oracle.com/javase/6/docs/technotes/guides/security/StandardNames.html
          */
-        kp = KeyPairGenerator.getInstance(SignatureExample.KEYGEN_ALG).generateKeyPair();
-        pubSignKey = kp.getPublic();
-        privSignKey = kp.getPrivate();
-        
+        final KeyPair key = KeyPairGenerator.getInstance("RSA").generateKeyPair();
+
         /**
          * Alice creates Signature object defining Signature algorithm.
          */
-        Signature sig1 = Signature.getInstance(SignatureExample.SIGN_ALG1);
-        
+        final Signature signatureAlg = Signature.getInstance("SHA1withRSA");
+
         /**
-         * Alice initializes Signature object:
+         * We initialize the signature object with
          * - Operation modes (SIGN) and
          * - provides appropriate ***Private*** Key
          */
-        sig1.initSign(privSignKey);
-        
+        signatureAlg.initSign(key.getPrivate());
+
+        // Finally, we load the message into the signature object and sign it
+        signatureAlg.update(text.getBytes("UTF-8"));
+        final byte[] signedText = signatureAlg.sign();
+        System.out.println("Signature: " + DatatypeConverter.printHexBinary(signedText));
+
         /**
-         * Alice signs message
+         * To verify the signature, we create another signature object
+         * and specify its algorithm
          */
-        sig1.update(TEXT.getBytes());
-        byte[] signed_TEXT = sig1.sign();
-        
+        final Signature signatureAlg2 = Signature.getInstance("SHA1withRSA");
+
         /**
-         * Bob creates Signature object defining Signature algorithm
+         * We have to initialize it with the mode. But to verify the algorithm,
+         * we only need the public key of the original signee
          */
-        Signature sig2 = Signature.getInstance(SignatureExample.SIGN_ALG1);
-        
-        /**
-         * Bob initializes Signature object:
-         * - Operation modes (VERIFY) and
-         * - provides appropriate ***Public*** Key 
-         */
-        sig2.initVerify(pubSignKey);
-        
-        /**
-         * Bob verifies received message providing
-         * - received message and
-         * - received signature.
-         */
-        sig2.update(TEXT.getBytes());
-        if(true == sig2.verify(signed_TEXT))
-            System.out.println("Signature is valid.");
+        signatureAlg2.initVerify(key.getPublic());
+
+        //Finally, we can check whether the signature is valid
+        signatureAlg2.update(text.getBytes("UTF-8"));
+
+        if (signatureAlg2.verify(signedText))
+            System.out.println("Valid signature.");
         else
-            System.out.println("Signature is *** NOT *** valid.");
+            System.err.println("Invalid signature.");
     }
 }

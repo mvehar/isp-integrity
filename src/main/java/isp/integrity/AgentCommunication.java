@@ -9,13 +9,12 @@ import java.util.logging.Logger;
  * I0->[I1]->A1->B1->A2->B2->A3->B3
  * <p/>
  * EXERCISE I1:
- * A communication channel is implemented by thread-safe blocking queue using
- * linked-list data structure.
+ * A communication channel is implemented with thread-safe blocking queue.
  * <p/>
  * Both agents are implemented by extending the Agents class,
  * creating anonymous class and overriding run(...) method.
  * <p/>
- * Both agents are "fired" at the end of the main method definition below.
+ * Both agents are started at the end of the main method definition below.
  * <p/>
  * Task:Study example.
  *
@@ -87,7 +86,7 @@ public class AgentCommunication {
 
         /**
          * STEP 4.
-         * Two commands below "fire" both agents and the fun begins ... :-)
+         * Agents are started
          */
         bob.start();
         alice.start();

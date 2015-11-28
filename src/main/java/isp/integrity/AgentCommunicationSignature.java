@@ -1,73 +1,68 @@
-package isp.integrity; /**
+package isp.integrity;
+
+import javax.xml.bind.DatatypeConverter;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.Signature;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.logging.Logger;
+
+/**
  * I0->I1->A1->B1->A2->B2->A3->[B3]
- * 
+ * <p/>
  * EXERCISE B3:
- * An agent communication example. Message Authenticity and Integrity 
- * is provided using Digital Signature. Because private key is owned only
- * by one party, message source is verified and thus, 
- * non-repudiation property is provided.
- * 
+ * An agent communication example. The authenticity and integrity of messages
+ * are provided with the use of digital signatures.
+ * <p/>
+ * Additionally, since the signing key (private key) is owned only by the signee,
+ * we can be certain that valid signature can only be provided by that party. This
+ * provides an additional property called non-repudiation.
+ * <p/>
  * Special care has to be taken when transferring binary stream over the communication
- * channel, thus, Base64 encoding/decoding is used to transfer checksums.
- * 
- * A communication channel is implemented by thread-safe blocking queue using
- * linked-list data structure.
- * 
+ * channel, thus, HEX encoding as strings is used to transfer checksums.
+ * <p/>
+ * A communication channel is implemented by thread-safe blocking queue.
+ * <p/>
  * Both agent behavior are implemented by extending Agents class and
  * creating anonymous class and overriding run(...) method.
- * 
- * Both agents are "fired" at the end of the main method definition below.
- * 
+ * <p/>
+ * Both agents are started at the end of the main method definition below.
+ * <p/>
  * EXERCISE:
- * - Study this example.
- * - Observe what happens if Alice's transmitter is corrupted?
- * - Observe both signatures in hexadecimal format (use Formatter).
- * 
+ * - Study the example.
+ * - Observe both signatures in hexadecimal format
+ * <p/>
  * INFO:
  * http://docs.oracle.com/javase/6/docs/technotes/guides/security/crypto/CryptoSpec.html#Signature
- * 
+ *
  * @author Iztok Starc <iztok.starc@fri.uni-lj.si>
- * @date 12. 12. 2011
  * @version 1
+ * @date 12. 12. 2011
  */
-
-
-import java.security.*;
-import java.util.concurrent.*;
-
 public class AgentCommunicationSignature {
-    
-    /**
-     * Standard Algorithm Names
-     * http://docs.oracle.com/javase/6/docs/technotes/guides/security/StandardNames.html
-     */
-    public static String KEYGEN_ALG = "RSA";
-    public static String SIGN_ALG1 = "MD5withRSA";
-    public static String SIGN_ALG2 = "SHA1withRSA";
-
-    private static BlockingQueue<String> alice2bob;
-    private static BlockingQueue<String> bob2alice;
-
-    private static Agent alice;
-    private static Agent bob;
+    private final static Logger LOG = Logger.getLogger(AgentCommunicationHMAC.class.getCanonicalName());
 
     public static void main(String[] args) throws NoSuchAlgorithmException {
-        
+
         /**
          * STEP 1.
-         * Alice creates public and private key. Bob receives her public key securly.
+         * Alice creates public and private key. Bob receives her public key.
          */
-        KeyPair keyPairAlice = KeyPairGenerator.getInstance(AgentCommunicationSignature.KEYGEN_ALG).generateKeyPair();
-        PublicKey pubSignKeyAlice = keyPairAlice.getPublic();
-        PrivateKey privSignKeyAlice = keyPairAlice.getPrivate();
-        
+        final KeyPair keyPairAlice = KeyPairGenerator.getInstance("RSA").generateKeyPair();
+        final PublicKey pkAlice = keyPairAlice.getPublic();
+        final PrivateKey skAlice = keyPairAlice.getPrivate();
+
         /**
          * STEP 2.
-         * Setup a unsecure communication channel.
+         * Setup an insecure communication channel.
          */
-        AgentCommunicationSignature.alice2bob = new LinkedBlockingQueue<String>();
-        AgentCommunicationSignature.bob2alice = new LinkedBlockingQueue<String>();
-        
+        final BlockingQueue<String> alice2bob = new LinkedBlockingQueue<>();
+        final BlockingQueue<String> bob2alice = new LinkedBlockingQueue<>();
+
         /**
          * STEP 3.
          * Agent Alice definition:
@@ -77,42 +72,44 @@ public class AgentCommunicationSignature {
          *   o Signature
          * - uses private key to sign message.
          */
-        alice = new Agent(bob2alice,alice2bob,null,null,privSignKeyAlice,SIGN_ALG1) {
-            
+        final Agent alice = new Agent(bob2alice, alice2bob, null, null, skAlice, "SHA1withRSA") {
+
             @Override
             public void run() {
-                try {                  
+                try {
                     /**
                      * STEP 3.1
                      * Alice writes a message and sends to Bob.
                      * This action is recorded in Alice's log.
                      */
-                    String TEXT = "I love you Bob. Kisses, Alice.";
-                    super.outgoing.put(TEXT);
-                    System.out.println("[Alice::Log]: I have sent the following message to Bob.");
-                    System.out.println("[Alice::Log]: message: " + TEXT);
-                    
+                    final String text = "I love you Bob. Kisses, Alice.";
+                    outgoing.put(text);
+
                     /**
-                     * STEP 3.2
+                     * TODO STEP 3.2
                      * In addition, Alice signs message using selected
                      * algorithm and her private key.
                      */
-                    //TODO
-                    //byte[] signed_TEXT
-                    
+
+                    final Signature alg = Signature.getInstance(macAlgorithm);
+                    alg.initSign(skAlice);
+                    alg.update(text.getBytes("UTF-8"));
+                    final byte[] signature = alg.sign();
+
                     /**
-                     * STEP 3.3
+                     * TODO: STEP 3.3
                      * Special care has to be taken when transferring binary stream 
-                     * over the communication channel, thus, 
-                     * Base64 encoding/decoding is used to transfer checksums.
+                     * over the communication channel: convert byte array into string
+                     * of HEX values with DatatypeConverter.printHexBinary(byte[])
                      */
-                    //TODO
-                    //super.outgoing.put(Base64.encode(signed_TEXT));
-                    
-                } catch (Exception ex) {}
+                    final String signatureHex = DatatypeConverter.printHexBinary(signature);
+                    outgoing.put(signatureHex);
+                    LOG.info("[Alice]: Sending: " + text + " with signature: " + signatureHex);
+                } catch (Exception ex) {
+                }
             }
         };
-        
+
         /**
          * STEP 4.
          * Agent Bob definition:
@@ -124,8 +121,8 @@ public class AgentCommunicationSignature {
          *   verify message authenticity and integrity. In addition,
          *   Alice cannot repudiate that she did not send the message.
          */
-        bob = new Agent(alice2bob,bob2alice,null,null,pubSignKeyAlice,SIGN_ALG1){
-            
+        final Agent bob = new Agent(alice2bob, bob2alice, null, null, pkAlice, "SHA1withRSA") {
+
             @Override
             public void run() {
                 try {
@@ -133,47 +130,42 @@ public class AgentCommunicationSignature {
                      * STEP 4.1
                      * Bob receives the message from Alice.
                      * This action is recorded in Bob's log.
-                     * 
-                     * IS AUTHENTICITIY AND INTEGRITIY PROPERTY PRESERVED? WE
-                     * DO NOT KNOW THIS YET!!!
                      */
-                    String received_TEXT = super.incoming.take();
-                    System.out.println("[Bob::Log]: I have received the following message from Alice.");
-                    System.out.println("[Bob::Log]: RECEIVED message: " + received_TEXT);
-                    
+                    final String receivedText = incoming.take();
+                    final String receivedSignatureHex = incoming.take();
+                    LOG.info("[Bob] Received: " + receivedText + " with signature: " + receivedSignatureHex);
+
                     /**
-                     * STEP 4.2
-                     * Special care has to be taken when transferring binary stream 
-                     * over the communication channel, thus, 
-                     * Base64 encoding/decoding is used to transfer checksums.
+                     * TODO STEP 4.2
+                     * Special care has to be taken when transferring binary stream
+                     * over the communication channel: convert byte array into string
+                     * of HEX values with DatatypeConverter.parseHexBinary(String)
                      */
-                    //TODO
-                    //byte[] received_signed_TEXT = Base64.decode(super.incoming.take()); /* */
-                    
+                    final byte[] receivedSignature = DatatypeConverter.parseHexBinary(receivedSignatureHex);
+
                     /**
                      * STEP 4.3
-                     * Bob calculates setups signature verification. He has to provide
+                     * Bob setups signature verification. He has to provide
                      * received text and Alice's public key.
                      */
-                    //TODO
-                    //received_TEXT.getBytes()
-                    
+                    final Signature alg = Signature.getInstance(macAlgorithm);
+                    alg.initVerify(pkAlice);
+                    alg.update(receivedText.getBytes("UTF-8"));
+
                     /**
-                     * STEP 4.4
+                     * TODO: STEP 4.4
                      * Bob verifies Alice's signature.
                      */
-                    //TODO
-                    /*
-                    if(true == sig.verify(received_signed_TEXT))
-                        System.out.println("[Bob::Log]: message AUTHENTICITY AND INTEGRITY VERIFIED. NON-REPDUIATION IS PROVIDED.");
+                    if (alg.verify(receivedSignature))
+                        LOG.info("[Bob]: Signature OK");
                     else
-                        System.out.println("[Bob::Log]: message AUTHENTICITY AND INTEGRITY IS ***NOT*** VERIFIED.");
-                    */
-                               
-                } catch (Exception ex) {}
+                        LOG.severe("[Bob]: Invalid signature");
+
+                } catch (Exception ex) {
+                }
             }
         };
-        
+
         /**
          * STEP 5.
          * Two commands below "fire" both agents and the fun begins ... :-)

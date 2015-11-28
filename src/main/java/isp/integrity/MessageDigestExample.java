@@ -40,6 +40,7 @@ public class MessageDigestExample {
          * STEP 4: Print out hash. Note we have to convert a byte array into
          * hexadecimal string representation.
          */
-        System.out.println(DatatypeConverter.printHexBinary(hashed));
+        final String hashAsHex = DatatypeConverter.printHexBinary(hashed);
+        System.out.println(hashAsHex);
     }
 }
