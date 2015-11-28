@@ -1,10 +1,5 @@
 package isp.integrity;
 
-import javax.xml.bind.DatatypeConverter;
-import java.io.UnsupportedEncodingException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Logger;
@@ -67,8 +62,6 @@ public class AgentCommunicationMessageDigest {
                      * STEP 2.1
                      * Alice writes a message and sends to Bob.
                      * This action is recorded in Alice's log.
-                     *
-                     * IS INTEGRITY PROPERTY PRESERVED??? WE DO NOT KNOW THIS YET!!!
                      */
                     final String message = "I love you Bob. Kisses, Alice.";
                     outgoing.put(message);
@@ -78,9 +71,6 @@ public class AgentCommunicationMessageDigest {
                      * In addition, Alice creates message digest using selected
                      * hash algorithm.
                      */
-                    final MessageDigest alg = MessageDigest.getInstance(macAlgorithm);
-                    final byte[] digest = alg.digest(message.getBytes("UTF-8"));
-                    final String digestHEX = DatatypeConverter.printHexBinary(digest);
 
                     /**
                      * TODO STEP 2.3
@@ -88,9 +78,7 @@ public class AgentCommunicationMessageDigest {
                      * over the communication channel: convert byte array into string
                      * of HEX values with DatatypeConverter.printHexBinary(byte[])
                      */
-                    outgoing.put(digestHEX);
-                    LOG.info("Alice: Sending to Bob: '" + message + "', digest: " + digestHEX);
-                } catch (InterruptedException | NoSuchAlgorithmException | UnsupportedEncodingException e) {
+                } catch (Exception e) {
                     LOG.severe("Exception: " + e.getMessage());
                 }
             }
@@ -123,27 +111,23 @@ public class AgentCommunicationMessageDigest {
                      * over the communication channel: convert received string into
                      * byte array with DatatypeConverter.parseHexBinary(String)
                      */
-                    final String receivedDigestHEX = incoming.take();
-                    final byte[] receivedDigest = DatatypeConverter.parseHexBinary(receivedDigestHEX);
 
                     /**
                      * TODO: STEP 3.3
                      * Bob calculates new message digest using selected hash algorithm and
                      * received text.
                      */
-                    final MessageDigest alg = MessageDigest.getInstance(macAlgorithm);
-                    final byte[] digestRecomputed = alg.digest(message.getBytes("UTF-8"));
 
                     /**
                      * TODO STEP 3.4
                      * Verify if received and calculated message digest checksum match.
                      */
-                    if (Arrays.equals(receivedDigest, digestRecomputed)) {
+                    /*if (Arrays.equals(receivedDigest, digestRecomputed)) {
                         LOG.info("Integrity checked");
                     } else {
                         LOG.warning("Integrity check failed.");
-                    }
-                } catch (InterruptedException | NoSuchAlgorithmException | UnsupportedEncodingException e) {
+                    }*/
+                } catch (Exception e) {
                     LOG.severe("Exception: " + e.getMessage());
                 }
             }

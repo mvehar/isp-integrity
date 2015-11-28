@@ -1,12 +1,10 @@
 package isp.integrity;
 
-import javax.xml.bind.DatatypeConverter;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
-import java.security.Signature;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Logger;
@@ -91,21 +89,14 @@ public class AgentCommunicationSignature {
                      * algorithm and her private key.
                      */
 
-                    final Signature alg = Signature.getInstance(macAlgorithm);
-                    alg.initSign(skAlice);
-                    alg.update(text.getBytes("UTF-8"));
-                    final byte[] signature = alg.sign();
-
                     /**
                      * TODO: STEP 3.3
                      * Special care has to be taken when transferring binary stream 
                      * over the communication channel: convert byte array into string
                      * of HEX values with DatatypeConverter.printHexBinary(byte[])
                      */
-                    final String signatureHex = DatatypeConverter.printHexBinary(signature);
-                    outgoing.put(signatureHex);
-                    LOG.info("[Alice]: Sending: " + text + " with signature: " + signatureHex);
                 } catch (Exception ex) {
+                    LOG.severe("Exception: " + ex.getMessage());
                 }
             }
         };
@@ -141,25 +132,21 @@ public class AgentCommunicationSignature {
                      * over the communication channel: convert byte array into string
                      * of HEX values with DatatypeConverter.parseHexBinary(String)
                      */
-                    final byte[] receivedSignature = DatatypeConverter.parseHexBinary(receivedSignatureHex);
 
                     /**
-                     * STEP 4.3
+                     * TODO STEP 4.3
                      * Bob setups signature verification. He has to provide
                      * received text and Alice's public key.
                      */
-                    final Signature alg = Signature.getInstance(macAlgorithm);
-                    alg.initVerify(pkAlice);
-                    alg.update(receivedText.getBytes("UTF-8"));
 
                     /**
                      * TODO: STEP 4.4
                      * Bob verifies Alice's signature.
                      */
-                    if (alg.verify(receivedSignature))
+                    /*if (alg.verify(receivedSignature))
                         LOG.info("[Bob]: Signature OK");
                     else
-                        LOG.severe("[Bob]: Invalid signature");
+                        LOG.severe("[Bob]: Invalid signature");*/
 
                 } catch (Exception ex) {
                     LOG.severe("Exception: " + ex.getMessage());
