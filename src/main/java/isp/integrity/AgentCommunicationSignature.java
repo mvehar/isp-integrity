@@ -162,6 +162,7 @@ public class AgentCommunicationSignature {
                         LOG.severe("[Bob]: Invalid signature");
 
                 } catch (Exception ex) {
+                    LOG.severe("Exception: " + ex.getMessage());
                 }
             }
         };

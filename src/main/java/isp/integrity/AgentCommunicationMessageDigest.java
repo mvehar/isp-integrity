@@ -15,7 +15,7 @@ import java.util.logging.Logger;
  * EXERCISE B1: Providing integrity to agent communications
  * <p/>
  * Special care has to be taken when transferring binary stream over the communication
- * channel, thus, Base64 encoding/decoding is used to transfer checksums.
+ * channel, thus, HEX is used to transfer checksums.
  * <p/>
  * A communication channel is implemented by thread-safe blocking queue using
  * linked-list data structure.
@@ -26,7 +26,6 @@ import java.util.logging.Logger;
  * <p/>
  * EXERCISE:
  * - Study example.
- * - Observe what happens if Alice's transmitter is corrupted?
  * - Observe both checksums in hexadecimal format (use Formatter).
  * - Mount a Man-in-The-Middle attack (after B3 is completed).
  * <p/>
@@ -79,9 +78,9 @@ public class AgentCommunicationMessageDigest {
                      * In addition, Alice creates message digest using selected
                      * hash algorithm.
                      */
-                    final MessageDigest digestAlgorithm = MessageDigest.getInstance("MD5");
-                    final byte[] digest = digestAlgorithm.digest(message.getBytes("UTF-8"));
-                    final String digestAsHex = DatatypeConverter.printHexBinary(digest);
+                    final MessageDigest alg = MessageDigest.getInstance(macAlgorithm);
+                    final byte[] digest = alg.digest(message.getBytes("UTF-8"));
+                    final String digestHEX = DatatypeConverter.printHexBinary(digest);
 
                     /**
                      * TODO STEP 2.3
@@ -89,8 +88,8 @@ public class AgentCommunicationMessageDigest {
                      * over the communication channel: convert byte array into string
                      * of HEX values with DatatypeConverter.printHexBinary(byte[])
                      */
-                    outgoing.put(digestAsHex);
-                    LOG.info("Alice: Sending to Bob: '" + message + "', digest: " + digestAsHex);
+                    outgoing.put(digestHEX);
+                    LOG.info("Alice: Sending to Bob: '" + message + "', digest: " + digestHEX);
                 } catch (InterruptedException | NoSuchAlgorithmException | UnsupportedEncodingException e) {
                     LOG.severe("Exception: " + e.getMessage());
                 }
@@ -124,22 +123,22 @@ public class AgentCommunicationMessageDigest {
                      * over the communication channel: convert received string into
                      * byte array with DatatypeConverter.parseHexBinary(String)
                      */
-                    final String receivedDigestAsHex = incoming.take();
-                    final byte[] receivedDigest = DatatypeConverter.parseHexBinary(receivedDigestAsHex);
+                    final String receivedDigestHEX = incoming.take();
+                    final byte[] receivedDigest = DatatypeConverter.parseHexBinary(receivedDigestHEX);
 
                     /**
                      * TODO: STEP 3.3
                      * Bob calculates new message digest using selected hash algorithm and
                      * received text.
                      */
-                    final MessageDigest digestAlgorithm = MessageDigest.getInstance("MD5");
-                    final byte[] computedDigest = digestAlgorithm.digest(message.getBytes("UTF-8"));
+                    final MessageDigest alg = MessageDigest.getInstance(macAlgorithm);
+                    final byte[] digestRecomputed = alg.digest(message.getBytes("UTF-8"));
 
                     /**
                      * TODO STEP 3.4
                      * Verify if received and calculated message digest checksum match.
                      */
-                    if (Arrays.equals(receivedDigest, computedDigest)) {
+                    if (Arrays.equals(receivedDigest, digestRecomputed)) {
                         LOG.info("Integrity checked");
                     } else {
                         LOG.warning("Integrity check failed.");

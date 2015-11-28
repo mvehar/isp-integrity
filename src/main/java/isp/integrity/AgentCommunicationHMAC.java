@@ -6,7 +6,7 @@ package isp.integrity; /**
  * is provided using Hash algorithm and Shared Secret Key.
  * <p/>
  * Special care has to be taken when transferring binary stream over the communication
- * channel, thus, Base64 encoding/decoding is used to transfer checksums.
+ * channel, thus, string HEX encoding/decoding is used to transfer checksums.
  * <p/>
  * A communication channel is implemented by thread-safe blocking queue using
  * linked-list data structure.
@@ -96,9 +96,9 @@ public class AgentCommunicationHMAC {
                      * over the communication channel: convert byte array into string
                      * of HEX values with DatatypeConverter.printHexBinary(byte[])
                      */
-                    final String hmacAsHex = DatatypeConverter.printHexBinary(hmac);
-                    outgoing.put(hmacAsHex);
-                    LOG.info("[Alice]: Sending '" + text + "' with hmac: '" + hmacAsHex + "'");
+                    final String hmacHEX = DatatypeConverter.printHexBinary(hmac);
+                    outgoing.put(hmacHEX);
+                    LOG.info("[Alice]: Sending '" + text + "' with hmac: '" + hmacHEX + "'");
                 } catch (Exception ex) {
                     LOG.severe("Exception: " + ex.getMessage());
                 }
@@ -135,7 +135,7 @@ public class AgentCommunicationHMAC {
                      * over the communication channel: convert byte array into string
                      * of HEX values with DatatypeConverter.parseHexBinary(String)
                      */
-                    final byte[] receivedHMAC = DatatypeConverter.parseHexBinary(receivedHMACHex);
+                    final byte[] receivedHmac = DatatypeConverter.parseHexBinary(receivedHMACHex);
 
                     /**
                      * TODO: STEP 4.3
@@ -144,13 +144,13 @@ public class AgentCommunicationHMAC {
                      */
                     final Mac alg = Mac.getInstance(macAlgorithm);
                     alg.init(macKey);
-                    final byte[] localHMAC = alg.doFinal(receivedText.getBytes("UTF-8"));
+                    final byte[] recomputedHmac = alg.doFinal(receivedText.getBytes("UTF-8"));
 
                     /**
                      * TODO: STEP 4.4
                      * Verify if received and calculated HMAC match.
                      */
-                    if (Arrays.equals(localHMAC, receivedHMAC))
+                    if (Arrays.equals(recomputedHmac, receivedHmac))
                         LOG.info("[Bob]: Authenticity and integrity verified.");
                     else
                         LOG.severe("[Bob]: Failed to verify authenticity and integrity.");
