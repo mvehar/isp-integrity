@@ -33,6 +33,7 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
 import javax.xml.bind.DatatypeConverter;
 import java.security.Key;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.concurrent.BlockingQueue;
@@ -42,8 +43,8 @@ import java.util.logging.Logger;
 /**
  * @author iztok
  */
-public class AgentCommunicationHMAC {
-    private final static Logger LOG = Logger.getLogger(AgentCommunicationHMAC.class.getCanonicalName());
+public class AgentCommunicationHMACMITM {
+    private final static Logger LOG = Logger.getLogger(AgentCommunicationHMACMITM.class.getCanonicalName());
 
     public static void main(String[] args) throws NoSuchAlgorithmException {
 
@@ -58,8 +59,12 @@ public class AgentCommunicationHMAC {
          * STEP 2.
          * Setup an insecure communication channel.
          */
-        final BlockingQueue<String> alice2bob = new LinkedBlockingQueue<>();
-        final BlockingQueue<String> bob2alice = new LinkedBlockingQueue<>();
+
+        final BlockingQueue<String> alice2maloy = new LinkedBlockingQueue<>();
+        final BlockingQueue<String> maloy2alice = new LinkedBlockingQueue<>();
+        final BlockingQueue<String> maloy2bob = new LinkedBlockingQueue<>();
+        final BlockingQueue<String> bob2maloy = new LinkedBlockingQueue<>();
+
 
         /**
          * STEP 3.
@@ -70,7 +75,7 @@ public class AgentCommunicationHMAC {
          *   o message
          *   o HMAC.
          */
-        final Agent alice = new Agent(bob2alice, alice2bob, null, null, hmacKey, "HmacMD5") {
+        final Agent alice = new Agent(maloy2alice, alice2maloy, null, null, hmacKey, "HmacMD5") {
             @Override
             public void run() {
                 try {
@@ -116,7 +121,7 @@ public class AgentCommunicationHMAC {
          * - uses shared secret session key to
          *   verify message authenticity and integrity.
          */
-        final Agent bob = new Agent(alice2bob, bob2alice, null, null, hmacKey, "HmacMD5") {
+        final Agent bob = new Agent(maloy2bob, bob2maloy, null, null, hmacKey, "HmacMD5") {
 
             @Override
             public void run() {
@@ -155,6 +160,61 @@ public class AgentCommunicationHMAC {
                         LOG.severe("[Bob]: Failed to verify authenticity and integrity.");
 
                 } catch (Exception ex) {
+                }
+            }
+        };
+
+        /**
+         * MALOY
+         */
+        final MITMAgent maloy = new MITMAgent(maloy2alice,alice2maloy,maloy2bob,bob2maloy, null, null, null, "HmacMD5") {
+
+            @Override
+            public void run() {
+                try {
+
+                    final String receivedText = incomingA.take();
+                    final String receivedHMACHex = incomingA.take();
+                    LOG.info("[Evil Maloy]: Received message '" + receivedText + "' with HMAC '" + receivedHMACHex + "'");
+
+                    final Mac hmacAlgorithm = Mac.getInstance(this.macAlgorithm);
+
+                    String possibleKey="";
+                    for(char c='0';c<'z';c++){
+                        hmacAlgorithm.init());
+
+                    }
+
+
+                    final byte[] receivedDigest = DatatypeConverter.parseHexBinary(receivedDigestString);
+
+
+                    final MessageDigest digestAlgorithm = MessageDigest.getInstance(this.macAlgorithm);
+                    final byte[] digestRecomputed = digestAlgorithm.digest(message.getBytes("UTF-8"));
+
+
+                    if (Arrays.equals(receivedDigest, digestRecomputed)) {
+                        LOG.info("Integrity checked");
+                    } else {
+                        LOG.warning("Integrity check failed.");
+                    }
+
+                    //TODO: Modify message and send it to bob wit new MAC
+                    LOG.info("Evil maloy will modify message..");
+                    final String messageModified = "I hate you Bob. Alice.";
+                    LOG.info("Sending modified msg: "+messageModified);
+                    outgoingB.put(messageModified);
+
+                    final byte[] hashedModified = digestAlgorithm.digest(messageModified.getBytes("UTF-8"));
+
+
+                    final String hashAsHexModified = DatatypeConverter.printHexBinary(hashedModified);
+
+
+                    outgoingB.put(hashAsHexModified);
+
+                } catch (Exception e) {
+                    LOG.severe("Exception: " + e.getMessage());
                 }
             }
         };

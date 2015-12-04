@@ -51,6 +51,8 @@ public class AgentCommunication {
                      * This action is recorded in Alice's log.
                      */
                     final String message = "I love you Bob. Kisses, Alice.";
+
+
                     outgoing.put(message);
                     LOG.info("Alice: Sending to Bob: " + message);
                 } catch (InterruptedException e) {

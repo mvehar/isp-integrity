@@ -8,8 +8,6 @@ package isp.integrity; /**
  * @version 1
  */
 
-import javax.crypto.Mac;
-import javax.xml.bind.DatatypeConverter;
 import java.security.Key;
 import java.util.concurrent.BlockingQueue;
 
@@ -20,16 +18,20 @@ import java.util.concurrent.BlockingQueue;
  * Agent's behavior is implemented by extending Agents class and
  * overriding run(...) method.
  */
-public abstract class Agent extends Thread {
-    protected final BlockingQueue<String> outgoing, incoming;
+public abstract class MITMAgent extends Thread {
+    protected final BlockingQueue<String> outgoingA, incomingA;
+    protected final BlockingQueue<String> outgoingB, incomingB;
 
     protected final Key macKey, cryptoKey;
     protected final String cryptoAlgorithm, macAlgorithm;
 
-    public Agent(final BlockingQueue<String> outgoing, final BlockingQueue<String> incoming, final Key cryptoKey,
-            final String cryptoAlgorithm, final Key macKey, final String macAlgorithm) {
-        this.outgoing = outgoing;
-        this.incoming = incoming;
+    public MITMAgent(final BlockingQueue<String> outgoingA, final BlockingQueue<String> incomingA,final BlockingQueue<String> outgoingB, final BlockingQueue<String> incomingB, final Key cryptoKey,
+                     final String cryptoAlgorithm, final Key macKey, final String macAlgorithm) {
+        this.outgoingA = outgoingA;
+        this.incomingA = incomingA;
+        this.outgoingB = outgoingB;
+        this.incomingB = incomingB;
+
         this.cryptoKey = cryptoKey;
         this.cryptoAlgorithm = cryptoAlgorithm;
         this.macKey = macKey;

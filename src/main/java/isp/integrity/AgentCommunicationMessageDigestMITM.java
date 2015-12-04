@@ -34,9 +34,9 @@ import java.util.logging.Logger;
  * @version 1
  * @date 12. 12. 2011
  */
-public class AgentCommunicationMessageDigest {
+public class AgentCommunicationMessageDigestMITM {
 
-    private final static Logger LOG = Logger.getLogger(AgentCommunicationMessageDigest.class.getCanonicalName());
+    private final static Logger LOG = Logger.getLogger(AgentCommunicationMessageDigestMITM.class.getCanonicalName());
 
     public static void main(String[] args) {
 
@@ -44,46 +44,25 @@ public class AgentCommunicationMessageDigest {
          * STEP 1.
          * Setup an insecure communication channel.
          */
-        final BlockingQueue<String> alice2bob = new LinkedBlockingQueue<>();
-        final BlockingQueue<String> bob2alice = new LinkedBlockingQueue<>();
+        final BlockingQueue<String> alice2maloy = new LinkedBlockingQueue<>();
+        final BlockingQueue<String> maloy2alice = new LinkedBlockingQueue<>();
+        final BlockingQueue<String> maloy2bob = new LinkedBlockingQueue<>();
+        final BlockingQueue<String> bob2maloy = new LinkedBlockingQueue<>();
 
         /**
-         * STEP 2.
-         * Agent Alice definition:
-         * - uses the communication channel,
-         * - sends a message that is comprised of:
-         *   o message
-         *   o Message Digest
-         * - checks if received and calculated message digest checksum match.
+         * ALICE -> MALOY
          */
-        final Agent alice = new Agent(bob2alice, alice2bob, null, null, null, "MD5") {
+        final Agent alice = new Agent(alice2maloy,maloy2alice, null, null, null, "MD5") {
 
             @Override
             public void run() {
                 try {
-                    /**
-                     * STEP 2.1
-                     * Alice writes a message and sends to Bob.
-                     * This action is recorded in Alice's log.
-                     */
                     final String message = "I love you Bob. Kisses, Alice.";
                     outgoing.put(message);
 
-                    /**
-                     * TODO: STEP 2.2
-                     * In addition, Alice creates message digest using selected
-                     * hash algorithm.
-                     */
                     final MessageDigest digestAlgorithm = MessageDigest.getInstance(this.macAlgorithm);
                     final byte[] hashed = digestAlgorithm.digest(message.getBytes("UTF-8"));
 
-
-                    /**
-                     * TODO STEP 2.3
-                     * Special care has to be taken when transferring binary stream 
-                     * over the communication channel: convert byte array into string
-                     * of HEX values with DatatypeConverter.printHexBinary(byte[])
-                     */
 
                     final String hashAsHex = DatatypeConverter.printHexBinary(hashed);
                     System.out.println(hashAsHex);
@@ -98,47 +77,74 @@ public class AgentCommunicationMessageDigest {
         };
 
         /**
-         * STEP 3. Agent Bob
-         * - uses the communication channel,
-         * - receives the message that is comprised of:
-         *   - message
-         *   - message digest
-         * - checks if received and calculated message digest checksum match.
+         * MALOY
          */
-        final Agent bob = new Agent(alice2bob, bob2alice, null, null, null, "MD5") {
+        final MITMAgent maloy = new MITMAgent(maloy2alice,alice2maloy,maloy2bob,bob2maloy, null, null, null, "MD5") {
 
             @Override
             public void run() {
                 try {
-                    /**
-                     * STEP 3.1
-                     * Bob receives the message from Alice.
-                     * This action is recorded in Bob's log.
-                     */
-                    final String message = incoming.take();
-                    LOG.info("Bob: I have received: " + message);
 
-                    /**
-                     * TODO STEP 3.2
-                     * Special care has to be taken when transferring binary stream 
-                     * over the communication channel: convert received string into
-                     * byte array with DatatypeConverter.parseHexBinary(String)
-                     */
-                    final String receivedDigestString = incoming.take();
+                    final String message = incomingA.take();
+                    LOG.info("Evil Maloy : I have received: " + message);
+
+
+                    final String receivedDigestString = incomingA.take();
                     final byte[] receivedDigest = DatatypeConverter.parseHexBinary(receivedDigestString);
 
-                    /**
-                     * TODO: STEP 3.3
-                     * Bob calculates new message digest using selected hash algorithm and
-                     * received text.
-                     */
+
                     final MessageDigest digestAlgorithm = MessageDigest.getInstance(this.macAlgorithm);
                     final byte[] digestRecomputed = digestAlgorithm.digest(message.getBytes("UTF-8"));
 
-                    /**
-                     * TODO STEP 3.4
-                     * Verify if received and calculated message digest checksum match.
-                     */
+
+                    if (Arrays.equals(receivedDigest, digestRecomputed)) {
+                        LOG.info("Integrity checked");
+                    } else {
+                        LOG.warning("Integrity check failed.");
+                    }
+
+                    //TODO: Modify message and send it to bob wit new MAC
+                    LOG.info("Evil maloy will modify message..");
+                    final String messageModified = "I hate you Bob. Alice.";
+                    LOG.info("Sending modified msg: "+messageModified);
+                    outgoingB.put(messageModified);
+
+                    final byte[] hashedModified = digestAlgorithm.digest(messageModified.getBytes("UTF-8"));
+
+
+                    final String hashAsHexModified = DatatypeConverter.printHexBinary(hashedModified);
+
+
+                    outgoingB.put(hashAsHexModified);
+
+                } catch (Exception e) {
+                    LOG.severe("Exception: " + e.getMessage());
+                }
+            }
+        };
+
+
+        /**
+         * BOB <- MALOY
+         */
+        final Agent bob = new Agent(bob2maloy,maloy2bob, null, null, null, "MD5") {
+
+            @Override
+            public void run() {
+                try {
+
+                    final String message = incoming.take();
+                    LOG.info("Bob: I have received: " + message);
+
+
+                    final String receivedDigestString = incoming.take();
+                    final byte[] receivedDigest = DatatypeConverter.parseHexBinary(receivedDigestString);
+
+
+                    final MessageDigest digestAlgorithm = MessageDigest.getInstance(this.macAlgorithm);
+                    final byte[] digestRecomputed = digestAlgorithm.digest(message.getBytes("UTF-8"));
+
+
                     if (Arrays.equals(receivedDigest, digestRecomputed)) {
                         LOG.info("Integrity checked");
                     } else {
@@ -150,10 +156,15 @@ public class AgentCommunicationMessageDigest {
             }
         };
 
+
+
+
+
         /**
          * STEP 4.
          * Two commands below "fire" both agents and the fun begins ... :-)
          */
+        maloy.start();
         bob.start();
         alice.start();
     }
